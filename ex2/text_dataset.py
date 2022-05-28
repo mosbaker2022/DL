@@ -76,7 +76,7 @@ class TextDataset(Dataset):
         sentences, tags, label_map= read_data(filepath, vec, tokenizer_use_lowercase, label_map)
         self.sentences_len = torch.Tensor([len(x) for x in sentences]).to(torch.long) # save the original lengths for the LSTM
         maxlen = min(max(np.array(self.sentences_len)), max_allowed_seq)
-        torch.clamp(self.sentences_len, max = max_allowed_seq) # limit saved length values to maxlen
+        self.sentences_len = torch.clamp(self.sentences_len, max = max_allowed_seq) # limit saved length values to maxlen
         # Make all sentences lengths equal to max length
         v_len = sentences[0].shape[1]
 
