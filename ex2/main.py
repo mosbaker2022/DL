@@ -47,7 +47,7 @@ if __name__ == '__main__':
         print('Local word2vec_vectors file not found- Downloading from gensim...')
         print('This may take a minute....')
         #word_vectors = gensim_api.load("glove-twitter-25")
-        word_vectors = gensim_api.load("glove-twitter-100 (387 MB)")
+        word_vectors = gensim_api.load("glove-twitter-100")
         #word_vectors = gensim_api.load('word2vec-google-news-300')
         #word_vectors.save('word2vec_vectors.kv')
         word_vectors.save('word_vectors.kv')
