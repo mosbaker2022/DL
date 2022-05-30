@@ -1,5 +1,4 @@
 import torch
-import gensim
 import gensim.downloader as gensim_api
 from gensim.models import KeyedVectors
 import argparse
@@ -11,20 +10,18 @@ import train_test
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Read data from data file into sentences.
-
-
 # Hyper parameters
-lstm_num_layers = 2
-lstm_hidden_size = 100
+lstm_num_layers = 1
+lstm_hidden_size = 64
 lstm_bidirectional = True
-lstm_drop_rate = 0.2
+lstm_drop_rate = 0.6
 loss_criterion = torch.nn.CrossEntropyLoss()
 optimizer_lr = 0.001
-num_epochs = 1
+num_epochs = 10
 batch_size = 64
 max_allowed_seq = 64 # maximum allowed tokens in one line
-tokenizer_use_lowercase = True
+use_embs = True
+feeze_embs = False
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -33,8 +30,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('data_location', type = str, default='C:/Einan/Study/Courses/097200/Homework/HW2/data/', help='Input file location')
+    parser.add_argument('data_location', type = str, help='Input file location')
     args = parser.parse_args()
+
     train_data_dir = os.path.join(args.data_location, 'trainEmotions.csv')
     test_data_dir = os.path.join(args.data_location, 'testEmotions.csv')
 
@@ -46,24 +44,19 @@ if __name__ == '__main__':
     else:
         print('Local word2vec_vectors file not found- Downloading from gensim...')
         print('This may take a minute....')
-        #word_vectors = gensim_api.load("glove-twitter-25")
         word_vectors = gensim_api.load("glove-twitter-100")
-        #word_vectors = gensim_api.load('word2vec-google-news-300')
-        #word_vectors.save('word2vec_vectors.kv')
         word_vectors.save('word_vectors.kv')
-    # Designate a special vector (0) for any word out of the vocabulary
 
-    v0 = np.zeros(word_vectors.vector_size)
+    # build a dedicated array for a model with embedding layer
+    embs = word_vectors.vectors
+    pad_vect = np.zeros((1,embs.shape[1])) # pad '<pad>' is a zero vector
+    unk_vect = np.mean(embs, axis=0, keepdims=True) # unknown '<unk>' is the mean of all vectors
+    embs = np.vstack((pad_vect, unk_vect, embs)) # insert pad and unk vectors at the beginning of the array
 
-    # use torchtext if available
-    # vec = torchtext.vocab.GloVe()
-
-    # Sentences contains the data, tags contain the labels as string, label map contains a dictionary that maps label
-    # strings to class number
-    train_dataset = TextDataset(train_data_dir, word_vectors,  {}, max_allowed_seq,
-                                tokenizer_use_lowercase)
-    test_dataset = TextDataset(test_data_dir, word_vectors, train_dataset.label_map, max_allowed_seq,
-                               tokenizer_use_lowercase)
+    train_dataset = TextDataset(train_data_dir, pad_vect, unk_vect, word_vectors,  {}, max_allowed_seq,
+                                use_embs)
+    test_dataset = TextDataset(test_data_dir, pad_vect, unk_vect, word_vectors, train_dataset.label_map, max_allowed_seq,
+                               use_embs)
 
     # Data Loader (Input Pipeline)
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
@@ -76,10 +69,16 @@ if __name__ == '__main__':
     input_dim = test_dataset.sentences[0].shape[1]
     num_classes = len(train_dataset.label_map)
     # Generate the model object
-    model = models.LSTM(input_size=input_dim, hidden_size=lstm_hidden_size, num_classes = num_classes, num_layers = lstm_num_layers,
+    if use_embs:
+        model = models.LSTM_emb(embs, feeze_embs = feeze_embs, hidden_size=lstm_hidden_size, num_classes=num_classes,
+                            num_layers=lstm_num_layers,
+                            bidir=lstm_bidirectional, drop_rate=lstm_drop_rate)
+    else:
+        model = models.LSTM(input_size=input_dim, hidden_size=lstm_hidden_size, num_classes = num_classes, num_layers = lstm_num_layers,
                         bidir = lstm_bidirectional, drop_rate = lstm_drop_rate)
     model.to(device)
-    optimizer = Adam(model.parameters(), lr=optimizer_lr)
+    # Define optimizer with some L2 regularization
+    optimizer = Adam(model.parameters(), lr=optimizer_lr,weight_decay=0.001)
     results = train_test.train(model, optimizer, device, loss_criterion, train_loader, test_loader, num_epochs)
     train_loss_list = results[0]
     valid_loss_list = results[1]

@@ -4,22 +4,15 @@ import torch
 def train(model, optimizer, device, criterion, train_loader, valid_loader, num_epochs):
     # initialize running values
     best_valid_loss = float("Inf")
-    running_loss = 0.0
-    valid_running_loss = 0.0
-    global_step = 0
     train_loss_list = []
     valid_loss_list = []
     train_accuracy_list = []
     test_accuracy_list = []
-
-    #global_steps_list = []
     step = 0
 
     # training loop
     model.train()
     for epoch in range(num_epochs):
-        if epoch == 20:
-            xx=1
         running_loss = 0.0
         model.train()
         train_accuracy = 0
@@ -30,6 +23,7 @@ def train(model, optimizer, device, criterion, train_loader, valid_loader, num_e
             data_len = data_len.to('cpu')
             output = model(data, data_len)
             loss = criterion(output, labels)
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -78,5 +72,8 @@ def train(model, optimizer, device, criterion, train_loader, valid_loader, num_e
         # checkpoint
         if best_valid_loss > average_valid_loss:
             best_valid_loss = average_valid_loss
-            #print('found better model')
+            best_valid_acc = average_test_accuracy
+            print('found better model... saving to best_model.pkl')
+            torch.save(model.state_dict(), 'best_model.pkl')
+    print('Training completed. Best model saved, Best validation loss: {:.4f}, Accuracy: {:.4f}'.format(best_valid_loss, best_valid_acc))
     return [train_loss_list, valid_loss_list, train_accuracy_list, test_accuracy_list]
