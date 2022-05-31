@@ -25,6 +25,21 @@ feeze_embs = False
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+def plot_heatmap():
+    fig = plt.figure(figsize=(15, 6))
+    ax = fig.add_subplot(111)
+    cax = ax.matshow(confusion.numpy())
+    fig.colorbar(cax)
+
+    ax.set_xticks(torch.arange(0, len(train_dataset.label_map)))
+    ax.set_yticks(torch.arange(0, len(train_dataset.label_map)))
+
+    # Set up axes
+    ax.set_xticklabels(train_dataset.label_map, rotation=90)
+    ax.set_yticklabels(train_dataset.label_map)
+
+    plt.show()
+
 # The program expects the data path as an argument, the folders test/ and train/
 # Should be located under this path.
 
@@ -84,6 +99,7 @@ if __name__ == '__main__':
     valid_loss_list = results[1]
     train_accuracy_list = results[2]
     test_accuracy_list = results[3]
+    confusion = results[4]
 
     # Plot Loss as a function of epoch number for test and train
     plt.title("Loss")
@@ -101,3 +117,5 @@ if __name__ == '__main__':
     plt.xlabel('Ephoc #')
     plt.ylabel('Accuracy')
     plt.show()
+
+    plot_heatmap()

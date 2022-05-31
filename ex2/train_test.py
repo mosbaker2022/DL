@@ -9,6 +9,8 @@ def train(model, optimizer, device, criterion, train_loader, valid_loader, num_e
     train_accuracy_list = []
     test_accuracy_list = []
     step = 0
+    n_categories = model.fc.out_features
+    confusion = torch.zeros(n_categories, n_categories)
 
     # training loop
     model.train()
@@ -39,6 +41,10 @@ def train(model, optimizer, device, criterion, train_loader, valid_loader, num_e
 
         # After each training epoch we run evaluation
         model.eval()
+
+        # Keep track of correct guesses in a confusion matrix
+        confusion_temp = torch.zeros(n_categories, n_categories)
+
         with torch.no_grad():
             test_accuracy = 0
             test_count = 0
@@ -53,6 +59,9 @@ def train(model, optimizer, device, criterion, train_loader, valid_loader, num_e
                 valid_running_loss += loss.item()
                 test_accuracy += torch.sum(torch.argmax(output,1) == labels)
                 test_count += len(labels)
+
+                for i in range(torch.argmax(output,1).size(0)):
+                    confusion_temp[labels[i]][torch.argmax(output,1)[i]] += 1
 
         # evaluation
         average_train_loss = running_loss / len(train_loader)
@@ -75,5 +84,11 @@ def train(model, optimizer, device, criterion, train_loader, valid_loader, num_e
             best_valid_acc = average_test_accuracy
             print('found better model... saving to best_model.pkl')
             torch.save(model.state_dict(), 'best_model.pkl')
+
+            # Normalize by dividing every row by its sum
+            for i in range(n_categories):
+                confusion[i] = confusion_temp[i] / confusion_temp[i].sum()
+
+#########
     print('Training completed. Best model saved, Best validation loss: {:.4f}, Accuracy: {:.4f}'.format(best_valid_loss, best_valid_acc))
-    return [train_loss_list, valid_loss_list, train_accuracy_list, test_accuracy_list]
+    return [train_loss_list, valid_loss_list, train_accuracy_list, test_accuracy_list, confusion]
