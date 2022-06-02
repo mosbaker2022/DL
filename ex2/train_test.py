@@ -22,7 +22,7 @@ def train(model, optimizer, device, criterion, train_loader, valid_loader, num_e
         for (data, labels, data_len) in train_loader:
             labels = labels.to(device)
             data = data.to(device)
-            data_len = data_len.to('cpu')
+            data_len = data_len.to('cpu') # data length for packing/padding must be in cpu
             output = model(data, data_len)
             loss = criterion(output, labels)
 
@@ -49,7 +49,7 @@ def train(model, optimizer, device, criterion, train_loader, valid_loader, num_e
             test_accuracy = 0
             test_count = 0
             valid_running_loss = 0.0
-            # validation loop
+            # validation after each epoch
             for (data, labels, data_len) in valid_loader:
                 labels = labels.to(device)
                 data = data.to(device)
@@ -89,6 +89,5 @@ def train(model, optimizer, device, criterion, train_loader, valid_loader, num_e
             for i in range(n_categories):
                 confusion[i] = confusion_temp[i] / confusion_temp[i].sum()
 
-#########
     print('Training completed. Best model saved, Best validation loss: {:.4f}, Accuracy: {:.4f}'.format(best_valid_loss, best_valid_acc))
     return [train_loss_list, valid_loss_list, train_accuracy_list, test_accuracy_list, confusion]

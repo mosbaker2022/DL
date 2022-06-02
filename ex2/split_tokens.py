@@ -1,3 +1,6 @@
+# Dictionary that mapps shortenning experssions to standard text
+# This helps by reducing the number of out of vocabulary words found in
+# text that has a lot of shortened expressions (such as in tweets
 split_tokens_dict =  {"ain't": "am not",
                  "aren't": "are not",
                  "can't": "can not",

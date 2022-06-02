@@ -25,6 +25,7 @@ feeze_embs = False
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+# Function that plots the cofusion matrix as a heat map
 def plot_heatmap():
     fig = plt.figure(figsize=(15, 6))
     ax = fig.add_subplot(111)
@@ -68,12 +69,13 @@ if __name__ == '__main__':
     unk_vect = np.mean(embs, axis=0, keepdims=True) # unknown '<unk>' is the mean of all vectors
     embs = np.vstack((pad_vect, unk_vect, embs)) # insert pad and unk vectors at the beginning of the array
 
+    # Pre-processor: Read data, clean, tokenize, map to vocabulary.
     train_dataset = TextDataset(train_data_dir, pad_vect, unk_vect, word_vectors,  {}, max_allowed_seq,
                                 use_embs)
     test_dataset = TextDataset(test_data_dir, pad_vect, unk_vect, word_vectors, train_dataset.label_map, max_allowed_seq,
                                use_embs)
 
-    # Data Loader (Input Pipeline)
+    # Data Loaders (Input Pipeline)
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
                                                batch_size=batch_size,
                                                shuffle=True)
@@ -84,17 +86,19 @@ if __name__ == '__main__':
     input_dim = test_dataset.sentences[0].shape[1]
     num_classes = len(train_dataset.label_map)
     # Generate the model object
-    if use_embs:
+    if use_embs: # Default model: model with a full embedding layer
         model = models.LSTM_emb(embs, feeze_embs = feeze_embs, hidden_size=lstm_hidden_size, num_classes=num_classes,
                             num_layers=lstm_num_layers,
                             bidir=lstm_bidirectional, drop_rate=lstm_drop_rate)
-    else:
+    else: # Non-used model: Model without an embedding layer (use vectors from GloVe as inputs)
         model = models.LSTM(input_size=input_dim, hidden_size=lstm_hidden_size, num_classes = num_classes, num_layers = lstm_num_layers,
                         bidir = lstm_bidirectional, drop_rate = lstm_drop_rate)
     model.to(device)
     # Define optimizer with some L2 regularization
     optimizer = Adam(model.parameters(), lr=optimizer_lr,weight_decay=0.001)
+    # Train and test
     results = train_test.train(model, optimizer, device, loss_criterion, train_loader, test_loader, num_epochs)
+    # Result summary
     train_loss_list = results[0]
     valid_loss_list = results[1]
     train_accuracy_list = results[2]
@@ -117,5 +121,5 @@ if __name__ == '__main__':
     plt.xlabel('Ephoc #')
     plt.ylabel('Accuracy')
     plt.show()
-
+    # Plot confusion matrix
     plot_heatmap()
