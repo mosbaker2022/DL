@@ -32,36 +32,44 @@ def predict(model, device, data_loader):
         predictions += list(predicted_class.to('cpu'))
     return predictions
 
+# The program expects the tested file path as an argument
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('data_location', type = str, help='Input file location')
     args = parser.parse_args()
     test_data_dir = os.path.join(args.data_location)
+    # Check if the vocabulary embedding model was saved before, if it was just
+    # load it. If it wasn't, generate it from gensim and save it for the next time
     if os.path.isfile('word_vectors.kv'):
         print('Found local word_vectors file- Loading ...')
         word_vectors = KeyedVectors.load('word_vectors.kv')
     else:
         print("Missing local word_vectors file...")
         exit(-1)
+    # build a dedicated array for a model with embedding layer
     embs = word_vectors.vectors
     pad_vect = np.zeros((1, embs.shape[1]))  # pad '<pad>' is a zero vector
     unk_vect = np.mean(embs, axis=0, keepdims=True)  # unknown '<unk>' is the mean of all vectors
     embs = np.vstack((pad_vect, unk_vect, embs))  # insert pad and unk vectors at the beginning of the array
-
+    # Define labels and mappings to class numbers
     label_map = {'happiness':0, 'sadness': 1, 'neutral': 2}
-
+    # Pre-processor: Read data, clean, tokenize, map to vocabulary.
     test_dataset = TextDataset(test_data_dir, pad_vect, unk_vect, word_vectors, label_map,
                                max_allowed_seq,
                                use_embs)
+    # Data Loaders (Input Pipeline)
     test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                               batch_size=batch_size,
                                               shuffle=False)
+    # Instantiate the model and load saved state from training phase
     model = models.LSTM_emb(embs, feeze_embs=feeze_embs, hidden_size=lstm_hidden_size, num_classes=len(label_map),
                             num_layers=lstm_num_layers,
                             bidir=lstm_bidirectional, drop_rate=lstm_drop_rate)
     model.load_state_dict(torch.load('best_model.pkl'))
     model.to(device)
+    # Run the actual prediction function
     predicted_labels = predict(model, device, test_loader)
+    # Rebuild the input file but replace the original labels with the ones obtained from prediction
     class_to_label = list(label_map.keys())
     with open(test_data_dir, 'r') as f:  # Read file into string
         lines_data = f.readlines()
@@ -71,8 +79,8 @@ if __name__ == '__main__':
         for line1 in lines_data[1:]:
             split_index = line1.find(',')
             lebel_str = class_to_label[predicted_labels[n]] # assign the label from predictions
-            text_str = line1[split_index + 1:-1]
-            str1 = ''.join([lebel_str+',', text_str+'\n'])
+            text_str = line1[split_index + 1:]
+            str1 = ''.join([lebel_str+',', text_str])
             str_list.append(str1)
             n += 1
     with open('prediction.csv', 'w') as f:  # write strings into file
