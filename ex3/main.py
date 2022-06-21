@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torchvision
 import torch.nn.functional as F
@@ -21,11 +22,15 @@ def denorm(x):
     return out.clamp(0, 1)
 
 
+dim_size = 32
 # Image processing
 transform = transforms.Compose([
+    transforms.Resize([dim_size, dim_size]),
     transforms.ToTensor(),
     transforms.Normalize(mean=(0.5,),
-                         std=(0.5,))])
+                         std=(0.5,))
+])
+
 # MNIST dataset
 mnist = datasets.MNIST(root='./data/',
                        train=True,
@@ -35,17 +40,20 @@ mnist = datasets.MNIST(root='./data/',
 # data_loader = torch.utils.data.DataLoader(dataset=mnist, batch_size=100, shuffle=True)
 
 # todo: this fails with:  Dataset not found or corrupted
-train_dataset = dsets.CelebA(root='C:\Studies\DeepLearning\ex3_data',
+#train_dataset = dsets.CelebA(root='C:\\Studies\\DeepLearning',
+train_dataset = dsets.CelebA(root='../Einan',
                              split='train',
                              transform=transform,
                              download=False)  # make sure you set it to False
 
 data_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                          batch_size=100, shuffle=True)
+                                          batch_size=100, shuffle=False)
+#                                           batch_size = 100, shuffle = True)
 
 # Discriminator
 D = nn.Sequential(
-    nn.Linear(784, 256),
+    #    nn.Linear(784, 256),
+    nn.Linear(dim_size * dim_size * 3, 256),
     nn.LeakyReLU(0.2),
     nn.Linear(256, 256),
     nn.LeakyReLU(0.2),
@@ -58,7 +66,8 @@ G = nn.Sequential(
     nn.LeakyReLU(0.2),
     nn.Linear(256, 256),
     nn.LeakyReLU(0.2),
-    nn.Linear(256, 784),
+    # nn.Linear(256, 784),
+    nn.Linear(256, dim_size * dim_size * 3),
     nn.Tanh())
 
 if torch.cuda.is_available():
@@ -71,12 +80,25 @@ criterion = nn.BCELoss()
 d_optimizer = torch.optim.Adam(D.parameters(), lr=0.0003)
 g_optimizer = torch.optim.Adam(G.parameters(), lr=0.0003)
 
+def show(im):
+    fix, axs = plt.subplots()
+    img = transforms.ToPILImage()(denorm(im.to('cpu')))
+    axs.imshow(np.asarray(img))
+    # img = np.asarray(im)
+    # img = transforms.ToPILImage()(img)
+    # axs.imshow(np.asarray(img))
+    axs.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+    plt.show()
+
 for epoch in range(200):
     accuracy_real = 0
     accuracy_fake = 0
 
     for i, (images, _) in enumerate(data_loader):
-        # Build mini-batch dataset
+ #       plt.imshow(denorm(images[0]).view(dim_size, dim_size, 3).cpu().numpy())
+#        plt.show()
+        #show(images[0])
+# Build mini-batch dataset
         batch_size = images.size(0)
         images = to_cuda(images.view(batch_size, -1))
 
@@ -92,6 +114,7 @@ for epoch in range(200):
         G.train(False)  # <-> G.eval()
 
         outputs = D(images)  # Real images
+
         d_loss_real = criterion(outputs.squeeze(1), real_labels)
         real_score = outputs
 
@@ -132,14 +155,22 @@ for epoch in range(200):
                   % (epoch, 200, i + 1, 600, d_loss.data, g_loss.data,
                      real_score.data.mean(), fake_score.data.mean()))
 
-    # Save real images
-    if (epoch + 1) == 1:
-        images = images.view(images.size(0), 1, 28, 28)
-        save_image(denorm(images.data), './data/real_images.png')
+            show(fake_images.data[0].view(3,32,32))
 
-    plt.imshow(denorm(fake_images.data[0]).view(28, 28).cpu().numpy(), cmap='gray')
+        if i >= 600:
+            break
+
+
+    # Save real images
+    # if (epoch + 1) == 1:
+    #    images = images.view(images.size(0), 1, dim_size, dim_size)
+    #        images = images.view(images.size(0), 1, 28, 28)
+    #   save_image(denorm(images.data), './data/real_images.png')
+
+    plt.imshow(denorm(fake_images.data[0]).view(dim_size, dim_size, 3).cpu().numpy())
+    #    plt.imshow(denorm(fake_images.data[0]).view(28, 28).cpu().numpy(), cmap='gray')
     plt.show()
 
     # Save sampled images
-    fake_images = fake_images.view(fake_images.size(0), 1, 28, 28)
-    save_image(denorm(fake_images.data), './data/fake_images-%d.png' % (epoch + 1))
+    # fake_images = fake_images.view(fake_images.size(0), 1, 28, 28)
+    # save_image(denorm(fake_images.data), './data/fake_images-%d.png' % (epoch + 1))
